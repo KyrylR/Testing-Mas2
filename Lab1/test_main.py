@@ -37,7 +37,5 @@ class TestMainProgram(unittest.TestCase):
             if os.path.exists(filename):
                 os.remove(filename)
 
-    # Additional integration tests can be added here
-
 if __name__ == '__main__':
     unittest.main()

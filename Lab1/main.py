@@ -4,39 +4,24 @@ import datetime
 import time
 import sys
 
-def compute_bernoulli_numbers(n_max):
+def compute_bernoulli_numbers():
     """
-    Computes Bernoulli numbers B_0 to B_n_max using the Akiyama–Tanigawa algorithm.
-
-    Parameters:
-    n_max (int): The maximum index n for which to compute B_n.
-
-    Returns:
-    list: A list containing Bernoulli numbers from B_0 to B_n_max.
-
-    Raises:
-    ValueError: If n_max is negative or not an integer.
+    Generator function that yields Bernoulli numbers B_n one at a time.
     """
-    if not isinstance(n_max, int) or n_max < 0:
-        raise ValueError("n_max must be a non-negative integer.")
-
-    A = [0.0] * (n_max + 1)  # Temporary list for computations
-    B = [0.0] * (n_max + 1)  # List to store Bernoulli numbers
-
-    for m in range(n_max + 1):
-        A[m] = 1 / (m + 1)
-        for j in range(m, 0, -1):
+    A = []
+    n = 0
+    while True:
+        A.append(1 / (n + 1))
+        for j in range(n, 0, -1):
             A[j - 1] = j * (A[j - 1] - A[j])
-        B[m] = A[0]  # The first element is the Bernoulli number B_m
-
-    # Adjust signs according to standard definitions
-    for n in range(1, n_max + 1):
+        B_n = A[0]
+        # Adjust signs according to standard definitions
         if n == 1:
-            B[n] = -B[n]  # Correct the sign for B_1
+            B_n = -B_n  # Correct the sign for B_1
         elif n % 2 == 1 and n > 1:
-            B[n] = 0.0  # Set B_n = 0 for odd n > 1
-
-    return B  # Returns a list of Bernoulli numbers B[0] to B[n_max]
+            B_n = 0.0  # Set B_n = 0 for odd n > 1
+        yield B_n
+        n += 1
 
 
 def compute_ln_sin_x(x, e):
@@ -75,8 +60,12 @@ def compute_ln_sin_x(x, e):
     n = 1
     max_n = 10000  # Increase limit to allow more terms
 
-    # Compute Bernoulli numbers up to necessary order
-    B = compute_bernoulli_numbers(2 * max_n + 2)  # Compute B[0] to B[2*max_n+2]
+    # Initialize the Bernoulli numbers generator
+    bernoulli_gen = compute_bernoulli_numbers()
+
+    # Skip B_0 since the series starts from B_2
+    next(bernoulli_gen)  # B_0
+    B_cache = [0.0]  # Cache for Bernoulli numbers
 
     start_time = time.time()
     ln_2 = math.log(2)
@@ -88,7 +77,14 @@ def compute_ln_sin_x(x, e):
         if time.time() - start_time > 15 * 60:  # 15 minutes limit
             raise TimeoutError("Cannot achieve desired precision within 15 minutes.")
 
-        B_2n = B[2 * n]  # Get Bernoulli number B_{2n}
+        # Ensure Bernoulli numbers are available up to 2n
+        B_n_index = 2 * n
+        while len(B_cache) <= B_n_index:
+            B_n = next(bernoulli_gen)
+            B_cache.append(B_n)
+
+        B_2n = B_cache[B_n_index]
+
         if B_2n == 0:
             n += 1
             continue
@@ -110,15 +106,20 @@ def compute_ln_sin_x(x, e):
         N = n  # Update term counter
         n += 1
 
-        # Compute ln(|T_n_plus1|) for next term
-        if 2 * n <= len(B) -1:
-            B_2n_next = B[2 * n]
-            if B_2n_next == 0:
-                continue
-            ln_T_n_plus1 = (2 * n - 1) * ln_2 + math.log(abs(B_2n_next)) + 2 * n * ln_abs_x_mod_pi - math.log(n) - math.lgamma(2 * n +1)
-            if ln_T_n_plus1 < ln_e:
-                break
-        else:
+        # Check if next term is smaller than e
+        B_n_index = 2 * n
+        while len(B_cache) <= B_n_index:
+            B_n = next(bernoulli_gen)
+            B_cache.append(B_n)
+
+        B_2n_next = B_cache[B_n_index]
+        if B_2n_next == 0:
+            continue
+
+        ln_T_n_plus1 = (2 * n - 1) * ln_2 + math.log(abs(B_2n_next)) + 2 * n * ln_abs_x_mod_pi - math.log(
+            n) - math.lgamma(2 * n + 1)
+
+        if ln_T_n_plus1 < ln_e:
             break
     else:
         raise ValueError("Cannot achieve desired precision with given x and e.")
@@ -230,9 +231,6 @@ def main():
                         if not (1 <= len(filename) <= 5):
                             print("Filename must be 1 to 5 characters long.")
                             continue
-                        if not re.match(r'^[a-zA-Zа-яА-Яіїєє0-9]{1,5}$', filename):
-                            print("Filename must contain only Latin/Ukrainian letters and digits.")
-                            continue
                         total_entries = save_results_to_file(filename, session_results)
                         if total_entries is not None:
                             print(f"Data saved to file '{filename}'. Total number of entries: {total_entries}")
@@ -261,9 +259,16 @@ def main():
                 start_time = time.time()
                 f_x_e, N = compute_ln_sin_x(x, e)
                 computation_time = time.time() - start_time
+
+                expected_value = math.log(abs(math.sin(x)))
+                print(f"X: {x}, Expected: {expected_value}, Actual: {f_x_e}, N: {N}")
+
                 if computation_time > 15 * 60:
                     print("Cannot achieve desired precision within reasonable time.")
                     continue
+                else:
+                    print(f"Computation time: {computation_time:.2f} seconds")
+
                 print(f"f(x, e) = {f_x_e:.12f}")
                 print(f"N(x, e) = {N}")
                 result = {
@@ -279,7 +284,6 @@ def main():
             except Exception as ex:
                 print("An error occurred:", ex)
                 continue
-    # Program ends here
 
 if __name__ == "__main__":
     main()

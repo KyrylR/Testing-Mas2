@@ -54,6 +54,9 @@ class TestComputeLnSinX(unittest.TestCase):
             with self.subTest(x=x):
                 f_x_e, N = compute_ln_sin_x(x, e)
                 expected_value = math.log(abs(math.sin(x)))
+
+                print(f"X: {x}, Expected: {expected_value}, Actual: {f_x_e}")
+
                 self.assertAlmostEqual(f_x_e, expected_value, places=4)
 
     def test_large_N(self):
