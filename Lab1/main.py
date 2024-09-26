@@ -1,28 +1,74 @@
-import math
+from decimal import Decimal, getcontext, ROUND_HALF_EVEN
 import re
 import datetime
 import time
 import sys
+import math
 
-def compute_bernoulli_numbers():
+# Set a default precision; adjust as needed
+getcontext().prec = 50
+
+def prime_sieve(n):
     """
-    Generator function that yields Bernoulli numbers B_n one at a time.
+    Returns a list of prime numbers up to n using Sieve of Eratosthenes.
     """
-    A = []
+    sieve = [True] * (n + 1)
+    sieve[0:2] = [False, False]
+    for current in range(2, int(n ** 0.5) + 1):
+        if sieve[current]:
+            sieve[current*2::current] = [False] * len(sieve[current*2::current])
+    return [num for num, is_prime in enumerate(sieve) if is_prime]
+
+def decimal_factorial(n):
+    """
+    Computes factorial of n using Decimal for high precision.
+    """
+    result = Decimal(1)
+    for i in range(1, n + 1):
+        result *= Decimal(i)
+    return result
+
+def compute_bernoulli_numbers_generator():
+    """
+    Generator function that yields Bernoulli numbers B_n one at a time,
+    using the McGown algorithm and Decimal for high-precision arithmetic.
+    """
     n = 0
+    primes = []
     while True:
-        A.append(1 / (n + 1))
-        for j in range(n, 0, -1):
-            A[j - 1] = j * (A[j - 1] - A[j])
-        B_n = A[0]
-        # Adjust signs according to standard definitions
-        if n == 1:
-            B_n = -B_n  # Correct the sign for B_1
-        elif n % 2 == 1 and n > 1:
-            B_n = 0.0  # Set B_n = 0 for odd n > 1
+        if n == 0:
+            B_n = Decimal(1)
+        elif n == 1:
+            B_n = Decimal('-0.5')
+        elif (n - 1) % 2 == 0:
+            B_n = Decimal(0)
+        else:
+            # Ensure the primes list contains all primes up to n+1
+            max_prime_needed = n + 1
+            if not primes or primes[-1] < max_prime_needed:
+                # Extend the primes list
+                primes = prime_sieve(max_prime_needed)
+            n_decimal = Decimal(n)
+            two_pi = Decimal('6.2831853071795864769252867665590057683943387987502')  # 2*pi
+            factorial_n = decimal_factorial(n)
+            K = Decimal(2) * factorial_n / (two_pi ** n_decimal)
+            d = Decimal(1)
+            for p in primes:
+                if n % (p - 1) == 0:
+                    d *= Decimal(p)
+            N = math.ceil((K * d) ** (Decimal(1) / (n - 1)))
+            z = Decimal(1)
+            for p in primes:
+                if p <= N:
+                    z *= Decimal(1) / (1 - Decimal(1) / (Decimal(p) ** n_decimal))
+            sign = Decimal(-1) ** (n // 2 + 1)
+            a = sign * d * K * z
+            a = a.to_integral_exact(rounding=ROUND_HALF_EVEN)
+            if a == 0:
+                a = Decimal((-1) ** (n // 2 + 1))
+            B_n = a / d
         yield B_n
         n += 1
-
 
 def compute_ln_sin_x(x, e):
     """
@@ -46,6 +92,9 @@ def compute_ln_sin_x(x, e):
     if not (0 < e < 1):
         raise ValueError("Precision e must be in the interval (0;1).")
 
+    if x <= -math.pi or x >= math.pi:
+        raise ValueError("Function undefined for x outside the interval (-π;π).")
+
     x_mod_pi = x % math.pi  # Reduce x modulo pi
     if x_mod_pi == 0 or x_mod_pi == math.pi:
         raise ValueError("Function undefined for x = k * pi")
@@ -61,7 +110,7 @@ def compute_ln_sin_x(x, e):
     max_n = 10000  # Increase limit to allow more terms
 
     # Initialize the Bernoulli numbers generator
-    bernoulli_gen = compute_bernoulli_numbers()
+    bernoulli_gen = compute_bernoulli_numbers_generator()
 
     # Skip B_0 since the series starts from B_2
     next(bernoulli_gen)  # B_0
@@ -176,7 +225,7 @@ def main():
     max_files = 5  # Maximum number of files allowed to be created
     while True:
         x_input = input("Enter the function argument: ")
-        if x_input.strip() == "Кінець":
+        if x_input.strip().lower() == "кінець":
             if not session_results:
                 print("No results to save.")
                 break

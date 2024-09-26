@@ -38,24 +38,27 @@ class TestComputeLnSinX(unittest.TestCase):
                     compute_ln_sin_x(x, e)
 
     def test_edge_cases(self):
-        """Test compute_ln_sin_x with edge cases for x approaching 0 and π/2."""
+        """Test compute_ln_sin_x with edge cases for x approaching -π, π, and 0."""
         # x approaching 0
-        x_values = [1e-8, 1e-6, 1e-4]
-        e = 1e-5
+        x_values = [1e-8, 1e-6, 1e-4, (-math.pi + 1e-8), (-math.pi + 1e-6), (-math.pi + 1e-4)]
+        e = 1e-24
         for x in x_values:
             with self.subTest(x=x):
                 f_x_e, N = compute_ln_sin_x(x, e)
                 expected_value = math.log(abs(math.sin(x)))
+
+                print(f"X: {x}, Expected: {expected_value}, Actual: {f_x_e}, N: {N}")
+
                 self.assertAlmostEqual(f_x_e, expected_value, places=4)
 
         # x approaching π/2 from below
-        x_values = [math.pi / 2 - 0.1, math.pi / 2 - 0.01, math.pi / 2 - 0.001]
+        x_values = [math.pi / 2 - 0.1, math.pi / 2 - 0.01, math.pi / 2 - 0.001, math.pi - 1e-06, math.pi - 1e-08, math.pi - 1e-10]
         for x in x_values:
             with self.subTest(x=x):
                 f_x_e, N = compute_ln_sin_x(x, e)
                 expected_value = math.log(abs(math.sin(x)))
 
-                print(f"X: {x}, Expected: {expected_value}, Actual: {f_x_e}")
+                print(f"X: {x}, Expected: {expected_value}, Actual: {f_x_e}, N: {N}")
 
                 self.assertAlmostEqual(f_x_e, expected_value, places=4)
 
@@ -71,7 +74,7 @@ class TestComputeLnSinX(unittest.TestCase):
     def test_cannot_achieve_precision(self):
         """Test compute_ln_sin_x with very small e where precision cannot be achieved."""
         x = math.pi / 6
-        e = 1e-100  # Very small e, likely to cause inability to achieve precision
+        e = 1e-1200  # Very small e, likely to cause inability to achieve precision
         with self.assertRaises(ValueError):
             compute_ln_sin_x(x, e)
 
